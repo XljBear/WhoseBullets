@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Bilibili - Whose Bullets
 // @namespace    http://www.xljbear.com/
-// @version      1.2
+// @version      1.4.2
 // @description  为您探寻到那些弹幕后的作者
 // @author       XljBearSoft
 // @match        https://www.bilibili.com/video/av*
 // @match        https://www.bilibili.com/bangumi/play/*
-// @icon   https://www.bilibili.com/favicon.ico
+// @icon     https://www.bilibili.com/favicon.ico
 // @supportURL   https://greasyfork.org/zh-CN/scripts/40341
 // @grant        none
 // ==/UserScript==
@@ -107,6 +107,7 @@ var BiliBili_midcrc = function(){
         return i+''+deepCheckData[1];
     };
 };
+var page_url = "";
 var b_crc = null;
 var ToastTime = null;
 var crcidList = [];
@@ -141,7 +142,7 @@ function GetAuthorProfile(mid){
         }
         vip = result.data.vip.vipStatus==1?" vip-red-name":"";
         place = result.data.place==""||result.data.place==undefined?"无地区信息":result.data.place;
-        profile = '<div style="min-height:0px;" class="bb-comment"><div style="padding-top:10px;" class="comment-list"><div class="list-item"><div class="reply-box"><div style="padding:0px" class="reply-item reply-wrap"><div style="margin:15px;" class="reply-face"><img src="'+ result.data.face +'" alt=""></div><div class="reply-con"><div class="user"><a style="display:initial;padding: 0px;" href="//space.bilibili.com/'+ mid +'" target="_blank" class="name'+ vip +'">'+ result.data.name +'</a> '+ sex +'<a style="display:initial;padding: 0px;" href="//www.bilibili.com/blackboard/help.html#%E4%BC%9A%E5%91%98%E7%AD%89%E7%BA%A7%E7%9B%B8%E5%85%B3" target="_blank"><i class="level l'+ result.data.level_info.current_level +'"></i></a></div><div class="info"><span class="time">'+ place +'</span></span></span></div></div></div></div></div></div></div>';
+        profile = '<div style="min-height:0px;z-index:-5;" class="bb-comment"><div style="padding-top:10px;" class="comment-list"><div class="list-item"><div class="reply-box"><div style="padding:0px" class="reply-item reply-wrap"><div style="margin:15px;" class="reply-face"><img src="'+ result.data.face +'" alt=""></div><div class="reply-con"><div class="user"><a style="display:initial;padding: 0px;" data-usercard-mid="'+ mid +'" href="//space.bilibili.com/'+ mid +'" target="_blank" class="name'+ vip +'">'+ result.data.name +'</a> '+ sex +'<a style="display:initial;padding: 0px;" href="//www.bilibili.com/blackboard/help.html#%E4%BC%9A%E5%91%98%E7%AD%89%E7%BA%A7%E7%9B%B8%E5%85%B3" target="_blank"><i class="level l'+ result.data.level_info.current_level +'"></i></a></div><div class="info"><span class="time">'+ place +'</span></span></span></div></div></div></div></div></div></div>';
         $(".context-menu-function.gotoSpace").html(profile);
         if($(".bilibili-player-context-menu-container.white.active>ul>li:eq(1)>a").html().substr(0,2)=="取消"){
             $(".bilibili-player-context-menu-container.white.active>ul>li:eq(1)>a").html("取消对" + result.data.name + "的弹幕屏蔽");
@@ -152,6 +153,9 @@ function GetAuthorProfile(mid){
     });
 }
 function PageReload(){
+    if(page_url == window.location.href)
+        return;
+    page_url = window.location.href;
     ShowToast("重载视频信息中...");
     crcidList = [];
     $.ajax({
@@ -205,21 +209,18 @@ function WhoseBulletsInit(){
                         return;
                     }
                     $(".bilibili-player-context-menu-container.white.active>ul").prepend(menu).attr("mid",mid);
+                    $(".bilibili-player-context-menu-container.white.active").css("z-index","999");
                     GetAuthorProfile(mid);
                 });
                 $(document).on("click","a.gotoSpace",function(){
                     mid = $(this).parent().parent().attr("mid");
                     window.open("https://space.bilibili.com/"+ mid +"/#/");
                 });
-                $(document).on("click","li[report-id='click_ep']",function(){
-                    setTimeout(PageReload,1000);
-                });
-                $(document).on("click",".multi-page a",function(){
-                    setTimeout(PageReload,1000);
-                });
                 $(document).on("contextmenu",".bilibili-player-video",function(){
                     //Todo
                 });
+                page_url = window.location.href;
+                setInterval(PageReload,1000);
                 ShowToast(crcidList.length + "条弹幕处理成功！");
             }else{
                 ShowToast("弹幕库处理失败！");
