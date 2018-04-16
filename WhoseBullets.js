@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Bilibili - Whose Bullets
 // @namespace    http://www.xljbear.com/
-// @version      1.4.2
+// @version      1.4.4
 // @description  为您探寻到那些弹幕后的作者
 // @author       XljBearSoft
 // @match        https://www.bilibili.com/video/av*
 // @match        https://www.bilibili.com/bangumi/play/*
-// @icon     https://www.bilibili.com/favicon.ico
-// @supportURL   https://greasyfork.org/zh-CN/scripts/40341
+// @icon	 https://www.bilibili.com/favicon.ico
+// @supportURL	 https://greasyfork.org/zh-CN/scripts/40341
 // @grant        none
 // ==/UserScript==
 (function() {
@@ -110,7 +110,8 @@ var BiliBili_midcrc = function(){
 var page_url = "";
 var b_crc = null;
 var ToastTime = null;
-var crcidList = [];
+var danmuList = [];
+var danmu_count = 0;
 var menu = '<li class="context-line context-menu-function gotoSpace" data-append="1"><a class="context-menu-a js-action gotoSpace" title="" href="javascript:void(0);" data-disabled="0"><span>正在获取...</span></a></li>';
 var menu_fail = '<li class="context-line context-menu-function" data-append="1"><a class="context-menu-a js-action" title="" href="javascript:void(0);" data-disabled="0">- (゜ロ゜;)抱歉!居然失败了... -</a></li>';
 var toast = '<div id="x_toast" style="box-shadow: white 0px 0px 3px;" class="player-tooltips info center-center animation active"><div class="tooltip" style="padding:15px 20px 15px 20px;"></div></div>';
@@ -152,27 +153,34 @@ function GetAuthorProfile(mid){
         $(".bilibili-player-context-menu-container.white.active>ul>li:eq(4)>a").html("查看"+ result.data.name +"的所有弹幕");
     });
 }
-function PageReload(){
-    if(page_url == window.location.href)
-        return;
-    page_url = window.location.href;
-    ShowToast("重载视频信息中...");
+function ProcessDanmu(showToast){
     crcidList = [];
     $.ajax({
         url:"https://comment.bilibili.com/" + window.cid + ".xml",
         dataType:"XML",
         success: function(danmu_xml){
             $(danmu_xml).find("d").each(function(index,item){
-                crcid = $(item).attr("p").split(",")[6];
-                crcidList[index] = crcid;
+                danmuList[index] = $(item).attr("p").split(",");
+                danmuList[index].push($(item).html());
             });
-            if(crcidList.length>0){
-                ShowToast(crcidList.length + "条弹幕处理成功！");
+            danmu_count = danmuList.length;
+            if(!showToast)return;
+            if(danmuList.length>0){
+                ShowToast(danmuList.length + "条弹幕处理成功！");
             }else{
-                ShowToast("弹幕库处理失败！");
+                ShowToast("弹幕库为空！");
             }
         }
     });
+}
+function PageReload(){
+    if(page_url == window.location.href){
+        return;
+    }
+    page_url = window.location.href;
+    ShowToast("重载视频信息中...");
+    danmuList = [];
+    ProcessDanmu(true);
 }
 function ShowToast(message){
     if(!$("#x_toast")[0]){
@@ -186,6 +194,34 @@ function ShowToast(message){
     clearTimeout(ToastTime);
     ToastTime = setTimeout(function(){$("#x_toast").fadeOut(1000);},3000);
 }
+function TimeCompareUp(danmu1,danmu2){
+    return danmu1[0]-danmu2[0];
+}
+function TimeCompareDown(danmu1,danmu2){
+    return danmu2[0]-danmu1[0];
+}
+function DanmuCompareUp(danmu1,danmu2){
+    if(danmu1[8]<danmu2[8]){
+        return -1;
+    }else if(danmu1[8]>danmu2[8]){
+        return 1;
+    }
+    return 0;
+}
+function DanmuCompareDown(danmu1,danmu2){
+    if(danmu1[8]<danmu2[8]){
+        return 1;
+    }else if(danmu1[8]>danmu2[8]){
+        return -1;
+    }
+    return 0;
+}
+function SendTimeCompareUp(danmu1,danmu2){
+    return danmu1[4]-danmu2[4];
+}
+function SendTimeCompareDown(danmu1,danmu2){
+    return danmu2[4]-danmu1[4];
+}
 function WhoseBulletsInit(){
     ShowToast("初始化弹幕库...");
     b_crc = new BiliBili_midcrc();
@@ -194,15 +230,16 @@ function WhoseBulletsInit(){
         dataType:"XML",
         success: function(danmu_xml){
             $(danmu_xml).find("d").each(function(index,item){
-                crcid = $(item).attr("p").split(",")[6];
-                crcidList[index] = crcid;
+                danmuList[index] = $(item).attr("p").split(",");
+                danmuList[index].push($(item).html());
             });
-            if(crcidList.length>0){
+            danmu_count = danmuList.length;
+            if(danmuList.length>0){
                 $(document).on("contextmenu",".danmaku-info-row.bpui-selected",function(){
                     if($(".bilibili-player-danmaku-wrap-child").css("display")!="none")
                         return;
                     cid = $(this).attr("dmno");
-                    mid = b_crc(crcidList[cid]);
+                    mid = b_crc(danmuList[cid][6]);
                     if(mid == -1){
                         ShowToast("嗷~用户信息获取失败了...");
                         $(".bilibili-player-context-menu-container.white.active>ul").prepend(menu_fail);
@@ -216,14 +253,41 @@ function WhoseBulletsInit(){
                     mid = $(this).parent().parent().attr("mid");
                     window.open("https://space.bilibili.com/"+ mid +"/#/");
                 });
+                $(document).on("click",".bilibili-player-danmaku-btn-time",function(){
+                    if($(".bilibili-player-danmaku-wrap-child").css("display")!="none")
+                        return;
+                    if($(this).find(".bilibili-player-icon-arrow-up")[0]){
+                        danmuList.sort(TimeCompareUp);
+                    }else{
+                        danmuList.sort(TimeCompareDown);
+                    }
+                });
+                $(document).on("click",".bilibili-player-danmaku-btn-danmaku",function(){
+                    if($(".bilibili-player-danmaku-wrap-child").css("display")!="none")
+                        return;
+                    if($(this).find(".bilibili-player-icon-arrow-up")[0]){
+                        danmuList.sort(DanmuCompareUp);
+                    }else{
+                        danmuList.sort(DanmuCompareDown);
+                    }
+                });
+                $(document).on("click",".bilibili-player-danmaku-btn-date",function(){
+                    if($(".bilibili-player-danmaku-wrap-child").css("display")!="none")
+                        return;
+                    if($(this).find(".bilibili-player-icon-arrow-up")[0]){
+                        danmuList.sort(SendTimeCompareUp);
+                    }else{
+                        danmuList.sort(SendTimeCompareDown);
+                    }
+                });
                 $(document).on("contextmenu",".bilibili-player-video",function(){
                     //Todo
                 });
                 page_url = window.location.href;
                 setInterval(PageReload,1000);
-                ShowToast(crcidList.length + "条弹幕处理成功！");
+                ShowToast(danmuList.length + "条弹幕处理成功！");
             }else{
-                ShowToast("弹幕库处理失败！");
+                ShowToast("弹幕库为空！");
             }
         }
     });
